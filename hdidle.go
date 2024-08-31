@@ -297,7 +297,7 @@ func writeToFile(file, text string, mode int) {
 		return
 	}
 
-	cacheFile, err := os.OpenFile(file, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+	cacheFile, err := os.OpenFile(file, mode, 0600)
 	if err != nil {
 		log.Fatalf("Cannot open file %s. Error: %s", file, err)
 	}
