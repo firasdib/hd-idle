@@ -173,6 +173,14 @@ func main() {
 		case "-d":
 			config.Defaults.Debug = true
 
+		case "-q":
+			statefile, err := argument(index)
+			if err != nil {
+				fmt.Println("Missing statefile after -q.")
+				os.Exit(1)
+			}
+			config.Defaults.StateFile = statefile
+
 		case "-h":
 			usage()
 			os.Exit(0)
@@ -219,7 +227,7 @@ func argument(index int) (string, error) {
 
 func usage() {
 	fmt.Println("usage: hd-idle [-t <disk>] [-s <symlink_policy>] [-a <name>] [-i <idle_time>] " +
-		"[-c <command_type>] [-p power_condition] [-l <logfile>] [-d] [-h]")
+		"[-c <command_type>] [-p power_condition] [-l <logfile>] [-q <statefile>] [-d] [-h]")
 }
 
 func poolInterval(deviceConfs []DeviceConf) time.Duration {

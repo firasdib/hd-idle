@@ -25,6 +25,7 @@ import (
 	"math"
 	"os"
 	"time"
+	"strings"
 )
 
 const (
@@ -40,6 +41,7 @@ type DefaultConf struct {
 	Debug          bool
 	LogFile        string
 	SymlinkPolicy  int
+	StateFile      string
 }
 
 type DeviceConf struct {
@@ -85,6 +87,8 @@ var lastNow = time.Now()
 func ObserveDiskActivity(config *Config) {
 	actualSnapshot := diskstats.Snapshot()
 
+	var sb strings.Builder
+
 	now = time.Now()
 	resolveSymlinks(config)
 	for _, stats := range actualSnapshot {
@@ -94,8 +98,18 @@ func ObserveDiskActivity(config *Config) {
 			Writes: stats.Writes,
 		}
 		updateState(*d, config)
+
+		if config.Defaults.StateFile != "" {
+			sb.WriteString(getStats(*d, config))
+		}
 	}
+
 	lastNow = now
+
+	if config.Defaults.StateFile != "" {
+		str := sb.String()
+		overwriteFile(config.Defaults.StateFile, str[:len(str)-1])
+	}
 }
 
 func resolveSymlinks(config *Config) {
@@ -177,6 +191,22 @@ func updateState(tmp DiskStats, config *Config) {
 	}
 }
 
+func getStats(tmp DiskStats, config *Config) string {
+	dsi := previousDiskStatsIndex(tmp.Name)
+	ds := previousSnapshots[dsi]
+
+	idleDuration := now.Sub(ds.LastIoAt)
+
+	text := fmt.Sprintf("disk=%s command=%s spunDown=%t "+
+		"reads=%d writes=%d idleTime=%v idleDuration=%v "+
+		"spindown=%s spinup=%s lastIO=%s\n",
+		ds.Name, ds.CommandType, ds.SpunDown,
+		ds.Reads, ds.Writes, ds.IdleTime.Seconds(), math.RoundToEven(idleDuration.Seconds()),
+		ds.SpinDownAt.Format(dateFormat), ds.SpinUpAt.Format(dateFormat), ds.LastIoAt.Format(dateFormat))
+
+	return text
+}
+
 func previousDiskStatsIndex(diskName string) int {
 	for i, stats := range previousSnapshots {
 		if stats.Name == diskName {
@@ -255,6 +285,14 @@ func logSpinupAfterSleep(name, file string) {
 }
 
 func logToFile(file, text string) {
+	writeToFile(file, text, os.O_CREATE|os.O_APPEND|os.O_WRONLY)
+}
+
+func overwriteFile(file, text string) {
+	writeToFile(file, text, os.O_CREATE|os.O_TRUNC|os.O_WRONLY)
+}
+
+func writeToFile(file, text string, mode int) {
 	if len(file) == 0 {
 		return
 	}
@@ -277,8 +315,8 @@ func (c *Config) String() string {
 	for _, device := range c.Devices {
 		devices += "{" + device.String() + "}"
 	}
-	return fmt.Sprintf("symlinkPolicy=%d, defaultIdle=%v, defaultCommand=%s, defaultPowerCondition=%v, debug=%t, logFile=%s, devices=%s",
-		c.Defaults.SymlinkPolicy, c.Defaults.Idle.Seconds(), c.Defaults.CommandType, c.Defaults.PowerCondition, c.Defaults.Debug, c.Defaults.LogFile, devices)
+	return fmt.Sprintf("symlinkPolicy=%d, defaultIdle=%v, defaultCommand=%s, defaultPowerCondition=%v, debug=%t, logFile=%s, devices=%s, stateFile=%s",
+		c.Defaults.SymlinkPolicy, c.Defaults.Idle.Seconds(), c.Defaults.CommandType, c.Defaults.PowerCondition, c.Defaults.Debug, c.Defaults.LogFile, devices, c.Defaults.StateFile)
 }
 
 func (dc *DeviceConf) String() string {

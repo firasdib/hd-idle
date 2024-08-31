@@ -53,7 +53,7 @@ uninstall:
 	rm -f $(TARGET_DIR)/sbin/$(TARGET)
 
 $(TARGET):
-	GOOS=linux GOARCH=$(GOARCH) go build
+	GOOS=linux GOARCH=$(GOARCH) go build -buildvcs=false
 
 test:
 	go test ./... -race -cover
