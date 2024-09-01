@@ -35,13 +35,14 @@ const (
 )
 
 type DefaultConf struct {
-	Idle           time.Duration
-	CommandType    string
-	PowerCondition uint8
-	Debug          bool
-	LogFile        string
-	SymlinkPolicy  int
-	StateFile      string
+	Idle            time.Duration
+	CommandType     string
+	PowerCondition  uint8
+	Debug           bool
+	LogFile         string
+	SymlinkPolicy   int
+	StateFile       string
+	PollingInterval time.Duration
 }
 
 type DeviceConf struct {
@@ -53,10 +54,11 @@ type DeviceConf struct {
 }
 
 type Config struct {
-	Devices  []DeviceConf
-	Defaults DefaultConf
-	SkewTime time.Duration
-	NameMap  map[string]string
+	Devices         []DeviceConf
+	Defaults        DefaultConf
+	SkewTime        time.Duration
+	NameMap         map[string]string
+	PollingInterval time.Duration
 }
 
 func (c *Config) resolveDeviceGivenName(name string) string {
@@ -315,8 +317,8 @@ func (c *Config) String() string {
 	for _, device := range c.Devices {
 		devices += "{" + device.String() + "}"
 	}
-	return fmt.Sprintf("symlinkPolicy=%d, defaultIdle=%v, defaultCommand=%s, defaultPowerCondition=%v, debug=%t, logFile=%s, devices=%s, stateFile=%s",
-		c.Defaults.SymlinkPolicy, c.Defaults.Idle.Seconds(), c.Defaults.CommandType, c.Defaults.PowerCondition, c.Defaults.Debug, c.Defaults.LogFile, devices, c.Defaults.StateFile)
+	return fmt.Sprintf("symlinkPolicy=%d, defaultIdle=%v, defaultCommand=%s, defaultPowerCondition=%v, debug=%t, logFile=%s, devices=%s, stateFile=%s pollingInterval=%v",
+		c.Defaults.SymlinkPolicy, c.Defaults.Idle.Seconds(), c.Defaults.CommandType, c.Defaults.PowerCondition, c.Defaults.Debug, c.Defaults.LogFile, devices, c.Defaults.StateFile, c.PollingInterval.Seconds())
 }
 
 func (dc *DeviceConf) String() string {

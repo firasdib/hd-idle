@@ -22,6 +22,7 @@ import (
 	"os"
 	"strconv"
 	"time"
+	"math"
 )
 
 const (
@@ -40,16 +41,18 @@ func main() {
 	singleDiskMode := false
 	var disk string
 	defaultConf := DefaultConf{
-		Idle:           defaultIdleTime,
-		CommandType:    SCSI,
-		PowerCondition: 0,
-		Debug:          false,
-		SymlinkPolicy:  0,
+		Idle:            defaultIdleTime,
+		CommandType:     SCSI,
+		PowerCondition:  0,
+		Debug:           false,
+		SymlinkPolicy:   0,
+		PollingInterval: math.MaxInt32,
 	}
 	var config = &Config{
-		Devices:  []DeviceConf{},
-		Defaults: defaultConf,
-		NameMap:  map[string]string{},
+		Devices:         []DeviceConf{},
+		Defaults:        defaultConf,
+		NameMap:         map[string]string{},
+		PollingInterval: math.MaxInt32,
 	}
 	var deviceConf *DeviceConf
 
@@ -181,6 +184,20 @@ func main() {
 			}
 			config.Defaults.StateFile = statefile
 
+		case "-w":
+			s, err := argument(index)
+			if err != nil {
+				fmt.Println("Missing polling_interval after -w. Must be a number.")
+				os.Exit(1)
+			}
+			polling_interval, err := strconv.Atoi(s)
+			if err != nil {
+				fmt.Printf("Wrong polling_interval -w %d. Must be a number.", polling_interval)
+				os.Exit(1)
+			}
+
+			config.Defaults.PollingInterval = time.Duration(polling_interval) * time.Second
+
 		case "-h":
 			usage()
 			os.Exit(0)
@@ -203,13 +220,15 @@ func main() {
 	if deviceConf != nil {
 		config.Devices = append(config.Devices, *deviceConf)
 	}
+
+	config.PollingInterval = poolInterval(config.Devices, config.Defaults.PollingInterval)
+	config.SkewTime = config.PollingInterval * 3
+
 	fmt.Println(config.String())
 
-	interval := poolInterval(config.Devices)
-	config.SkewTime = interval * 3
 	for {
 		ObserveDiskActivity(config)
-		time.Sleep(interval)
+		time.Sleep(config.PollingInterval)
 	}
 }
 
@@ -227,12 +246,12 @@ func argument(index int) (string, error) {
 
 func usage() {
 	fmt.Println("usage: hd-idle [-t <disk>] [-s <symlink_policy>] [-a <name>] [-i <idle_time>] " +
-		"[-c <command_type>] [-p power_condition] [-l <logfile>] [-q <statefile>] [-d] [-h]")
+		"[-c <command_type>] [-p power_condition] [-l <logfile>] [-q <statefile>] [-w <global_polling_interval>] [-d] [-h]")
 }
 
-func poolInterval(deviceConfs []DeviceConf) time.Duration {
+func poolInterval(deviceConfs []DeviceConf, globalPollingInterval time.Duration) time.Duration {
 	if len(deviceConfs) == 0 {
-		return defaultIdleTime / 10
+		return minDuration(defaultIdleTime / 10, globalPollingInterval)
 	}
 
 	interval := defaultIdleTime
@@ -249,5 +268,11 @@ func poolInterval(deviceConfs []DeviceConf) time.Duration {
 	if sleepTime == 0 {
 		return time.Second
 	}
-	return sleepTime
+
+	return minDuration(sleepTime, globalPollingInterval)
+}
+
+func minDuration(a, b time.Duration) time.Duration {
+    if a <= b { return a }
+    return b
 }
